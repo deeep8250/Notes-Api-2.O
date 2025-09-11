@@ -6,6 +6,7 @@ import (
 	"pr01/db"
 	"pr01/models"
 	"pr01/utils"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -129,6 +130,27 @@ func CreateNotes(c *gin.Context) {
 
 }
 
+func ReadNotes(c *gin.Context) {
+	email, exist := c.Get("email")
+	if !exist {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "unauthorized user",
+		})
+		return
+	}
+
+	var user models.User
+	verify := db.DB.Preload("Notes").Where("email=?", email).First(&user)
+	if verify.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "user isnt found or something went wrong"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"response": user,
+	})
+
+}
+
 func DeleteNotes(c *gin.Context) {
 	email, exist := c.Get("email")
 	if !exist {
@@ -160,23 +182,93 @@ func DeleteNotes(c *gin.Context) {
 
 }
 
-func ReadNotes(c *gin.Context) {
-	email, exist := c.Get("email")
-	if !exist {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "unauthorized user",
+func UpdateNotes(c *gin.Context) {
+
+	//create a model for update
+	type Update struct {
+		Title string `json:"title"`
+		Body  string `json:"body"`
+	}
+
+	//recieving the id from params (note id)
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
 		})
 		return
 	}
 
+	//recieving the  body from postman
+	var update Update
+	err = c.ShouldBindJSON(&update)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	//recieving the user's details but first recieve the email form middleware or jwt token
+	email, ok := c.Get("email")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	//find user according to the email
 	var user models.User
-	verify := db.DB.Preload("Notes").Where("email=?", email).First(&user)
+	resp := db.DB.Where("email=?", email).First(&user)
+
+	if resp.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": resp.Error.Error(),
+		})
+		return
+	}
+
+	if resp.RowsAffected == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "unauthorized user",
+		})
+		return
+	}
+
+	//fetch the note according to the id of note
+	var Note models.Notes
+	verify := db.DB.Model(models.Notes{}).Where("id=? AND user_id=?", id, user.UserId).First(&Note)
+
 	if verify.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "user isnt found or something went wrong"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": verify.Error.Error(),
+		})
+		return
+	}
+
+	if verify.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"message": "user not found",
+		})
+		return
+	}
+
+	//checking user input
+	if update.Title != "" {
+		Note.Notes_Title = update.Title
+	}
+	if update.Body != "" {
+		Note.Notes_Body = update.Body
+	}
+
+	r := db.DB.Save(&Note)
+	if r.RowsAffected == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "cant update the note",
+		})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"response": user,
+		"response": " update successfully",
 	})
 
 }

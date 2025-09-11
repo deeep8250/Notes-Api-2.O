@@ -22,7 +22,8 @@ type User struct {
 }
 
 type Notes struct {
-	NotesID string `gorm:"primaryKey" json:"notes_id"`
-	Notes   string `json:"notes"`
-	UserId  uint   `json:"user_id"`
+	NotesID     string `gorm:"primaryKey" json:"notes_id"`
+	Notes_Title string `json:"notes_title"`
+	Notes_Body  string `json:"notes_body"`
+	UserId      uint   `json:"user_id"`
 }
