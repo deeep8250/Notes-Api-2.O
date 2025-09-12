@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"pr01/db"
@@ -58,7 +59,7 @@ func SignUp(c *gin.Context) {
 	err := c.ShouldBindJSON(&user)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
+			"error1": err.Error(),
 		})
 		return
 	}
@@ -75,21 +76,24 @@ func SignUp(c *gin.Context) {
 	hashpPass, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 
-		log.Println("error : ", err.Error())
+		log.Println("error2 : ", err.Error())
 		return
 	}
+	var user2 models.User
 
-	user.Password = string(hashpPass)
+	user2.Email = user.Email
+	user2.Name = user.Name
+	user2.Password = string(hashpPass)
 
-	result := db.DB.Create(&user)
+	result := db.DB.Create(&user2)
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": result.Error.Error(),
+			"error3": result.Error.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, user2)
 
 }
 
@@ -128,9 +132,13 @@ func CreateNotes(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusOK, gin.H{
+		"response": "note added",
+	})
+
 }
 
-func ReadNotes(c *gin.Context) {
+func GetNotes(c *gin.Context) {
 	email, exist := c.Get("email")
 	if !exist {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -168,7 +176,7 @@ func DeleteNotes(c *gin.Context) {
 	}
 
 	id := c.Param("id")
-	del := db.DB.Where("id=? AND user_id=?", id, user.UserId).Delete(&models.Notes{})
+	del := db.DB.Where("notes_id=? AND user_id=?", id, user.UserId).Delete(&models.Notes{})
 	if del.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"err": del.Error.Error(),
@@ -186,8 +194,8 @@ func UpdateNotes(c *gin.Context) {
 
 	//create a model for update
 	type Update struct {
-		Title string `json:"title"`
-		Body  string `json:"body"`
+		Title *string `json:"title"`
+		Body  *string `json:"body"`
 	}
 
 	//recieving the id from params (note id)
@@ -209,6 +217,7 @@ func UpdateNotes(c *gin.Context) {
 		return
 	}
 
+	fmt.Println("update : ", update)
 	//recieving the user's details but first recieve the email form middleware or jwt token
 	email, ok := c.Get("email")
 	if !ok {
@@ -236,7 +245,7 @@ func UpdateNotes(c *gin.Context) {
 
 	//fetch the note according to the id of note
 	var Note models.Notes
-	verify := db.DB.Model(models.Notes{}).Where("id=? AND user_id=?", id, user.UserId).First(&Note)
+	verify := db.DB.Model(models.Notes{}).Where("notes_id=? AND user_id=?", id, user.UserId).First(&Note)
 
 	if verify.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -253,11 +262,17 @@ func UpdateNotes(c *gin.Context) {
 	}
 
 	//checking user input
-	if update.Title != "" {
-		Note.Notes_Title = update.Title
+	fmt.Println("title : ", update.Title)
+	if update.Title != nil {
+		Note.Notes_Title = *update.Title
+		fmt.Println("title : ", Note.Notes_Title)
 	}
-	if update.Body != "" {
-		Note.Notes_Body = update.Body
+
+	fmt.Println("title : ", update.Body)
+	if update.Body != nil {
+		Note.Notes_Body = *update.Body
+		fmt.Println("Body : ", Note.Notes_Body)
+
 	}
 
 	r := db.DB.Save(&Note)
@@ -272,3 +287,49 @@ func UpdateNotes(c *gin.Context) {
 	})
 
 }
+
+// func GetNotes(c *gin.Context) {
+
+// 	id := c.Param("id")
+
+// 	email, ok := c.Get("email")
+// 	if !ok {
+// 		c.JSON(http.StatusUnauthorized, gin.H{
+// 			"error": "unauthorized user",
+// 		})
+// 		return
+// 	}
+
+// 	var user models.User
+// 	verify := db.DB.Where("email=?", email).First(&user)
+// 	if verify.Error != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{
+// 			"error": verify.Error.Error(),
+// 		})
+// 		return
+// 	}
+// 	if verify.RowsAffected == 0 {
+// 		c.JSON(http.StatusNotFound, gin.H{
+// 			"response": "user not found",
+// 		})
+// 	}
+
+// 	var notes []models.Notes
+// 	noteVerify := db.DB.Where("id=? AND user_id=?", id, user.UserId).Find(&notes)
+// 	if noteVerify.Error != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{
+// 			"error": noteVerify.Error.Error(),
+// 		})
+// 		return
+// 	}
+// 	if noteVerify.RowsAffected == 0 {
+// 		c.JSON(http.StatusNotFound, gin.H{
+// 			"response": "notes not found",
+// 		})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusOK, gin.H{
+// 		"Notes": notes,
+// 	})
+// }
