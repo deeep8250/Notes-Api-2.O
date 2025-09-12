@@ -177,9 +177,16 @@ func DeleteNotes(c *gin.Context) {
 
 	id := c.Param("id")
 	del := db.DB.Where("notes_id=? AND user_id=?", id, user.UserId).Delete(&models.Notes{})
+
+	if del.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": del.Error.Error(),
+		})
+		return
+	}
 	if del.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"err": del.Error.Error(),
+			"err": "note not exist",
 		})
 		return
 	}
